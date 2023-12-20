@@ -98,13 +98,15 @@
 #' @family Graph creation functions
 
 make_brainGraph <- function(x, atlas, type=c('observed', 'random'),
-                            level=c('subject', 'group', 'contrast'), set.attrs=TRUE,
+                            level=c('subject', 'group', 'contrast'), set.attrs=TRUE, attr_names = NULL, 
                             modality=NULL, weighting=NULL, threshold=NULL, ...) {
   UseMethod('make_brainGraph')
 }
 
 #' Create a brainGraph object from an igraph graph
 #'
+#' @attr_names Character string indicating which graph attributes to calculate. 
+#'   By default, all attributes are calculated. 
 #' @param name Character string indicating subject ID or group/contrast name,
 #'   depending on the \code{level}. Default: \code{NULL}
 #' @param Group Character string indicating group membership. Default:
@@ -114,10 +116,12 @@ make_brainGraph <- function(x, atlas, type=c('observed', 'random'),
 #'   vertices are used.
 #' @export
 #' @rdname make_brainGraph
+#' Modification history:
+#' 12-20-2023 (Mia Anthony) - added feature to specify which graph attributes should be calculated 
 
 make_brainGraph.igraph <- function(x, atlas, type=c('observed', 'random'),
                                    level=c('subject', 'group', 'contrast'),
-                                   set.attrs=TRUE, modality=NULL, weighting=NULL,
+                                   set.attrs=TRUE, attr_names = NULL, modality=NULL, weighting=NULL,
                                    threshold=NULL, name=NULL, Group=NULL, subnet=NULL, ...) {
   Brodmann <- lobe <- hemi <- index <- x.mni <- y.mni <- z.mni <- NULL
 
@@ -215,9 +219,9 @@ make_brainGraph.igraph <- function(x, atlas, type=c('observed', 'random'),
 
 make_brainGraph.matrix <- function(x, atlas, type=c('observed', 'random'),
                                    level=c('subject', 'group', 'contrast'),
-                                   set.attrs=TRUE, modality=NULL, weighting=NULL,
-                                   threshold=NULL, name=NULL, Group=NULL, subnet=NULL,
-                                   mode='undirected', weighted=NULL, diag=FALSE, ...) {
+                                   set.attrs=TRUE, attr_names = NULL, modality=NULL, 
+                                   weighting=NULL, threshold=NULL, name=NULL, Group=NULL, 
+                                   subnet=NULL, mode='undirected', weighted=NULL, diag=FALSE, ...) {
   type <- match.arg(type)
   level <- match.arg(level)
   if (!is.null(subnet)) {
@@ -228,7 +232,7 @@ make_brainGraph.matrix <- function(x, atlas, type=c('observed', 'random'),
     x <- x[subnet, subnet, drop=FALSE]
   }
   g <- graph_from_adjacency_matrix(x, mode, weighted, diag)
-  g <- make_brainGraph(g, atlas, type, level, set.attrs, modality, weighting,
+  g <- make_brainGraph(g, atlas, type, level, set.attrs, attr_names, modality, weighting,
                        threshold, name, Group, subnet, A=x, ...)
   return(g)
 }
@@ -248,7 +252,7 @@ make_brainGraph.matrix <- function(x, atlas, type=c('observed', 'random'),
 
 make_brainGraph.bg_mediate <- function(x, atlas=x$atlas, type='observed',
                                        level='contrast', set.attrs=FALSE,
-                                       modality=NULL, weighting=NULL,
+                                       attr_names = NULL, modality=NULL, weighting=NULL,
                                        threshold=NULL, ...) {
   stopifnot(inherits(x, 'bg_mediate'), x$level == 'vertex')
   med.sum <- summary(x)$DT
