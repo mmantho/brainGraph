@@ -97,14 +97,40 @@ set_brainGraph_attr <- function(g, type=c('observed', 'random'),
                                            '-log10(w/max(w))',
                                            '-log10(w/max(w)+1)'),
                                 clust.method='louvain') {
+  require(igraph)
+  require(NetworkToolbox)
+  
   if (!is_igraph(g) && !is.brainGraph(g)) {
     stop('Input graph must have class either "brainGraph" or "igraph"')
   }
-  V(g)$degree <- degree(g)
-  g$Cp <- transitivity(g, type='localaverage')
-  g$Lp <- mean_distance(g)
-  g$rich <- rich_club_all(g)
-  g$E.global <- efficiency(g, 'global', weights=NA)
+
+    # check for NaN weights and set to 0
+    if (sum(is.na(E(g)$weight)) > 0) {
+        idx <- which(is.na(E(g)$weight))
+        E(g)$weight[idx] <- 0
+    }
+
+  # calculate graph-level attributes
+    # degree
+  if ("degree" %in% graph_attr) {
+    V(g)$degree <- igraph::degree(g)
+  }
+    # global clustering coefficient (# transitivity ratio places more weight on the high-degree nodes, rather than low-degree nodes)
+  if ("Cp" %in% graph_attr) {
+    g$Cp <- igraph::transitivity(g, type='global')
+  }
+    # characteristic path length
+  if ("Lp" %in% graph_attr) {
+    g$Lp <- igraph::mean_distance(g)
+  } 
+    # rich club
+  if ("rich" %in% graph_attr) {
+    g$rich <- rich_club_all(g)
+  } 
+    # global efficiency
+  if ("E.global" %in% graph_attr) {
+    g$E.global <- efficiency(g, 'global', weights = NA)
+    }
 
   # Handle different cases for different community detection methods
   clust.funs <- ls('package:igraph', pattern='^cluster_')
@@ -137,20 +163,20 @@ set_brainGraph_attr <- function(g, type=c('observed', 'random'),
     clusts <- components(g)
     comps <- rev(table(clusts$csize))
     x <- clusts$membership
-    V(g)$comp <- match(x, order(table(x), decreasing=TRUE))
-    if (length(unique(x)) < n) g <- set_graph_colors(g, 'color.comp', V(g)$comp)
-    g$conn.comp <- data.frame(size=as.integer(names(comps)), number=as.integer(comps))
-    g$max.comp <- g$conn.comp[1L, 1L]
-    g$num.tri <- sum(count_triangles(g)) / 3
-    g$diameter <- diameter(g, weights=NA)
+    # V(g)$comp <- match(x, order(table(x), decreasing=TRUE))
+    # if (length(unique(x)) < n) g <- set_graph_colors(g, 'color.comp', V(g)$comp)
+    # g$conn.comp <- data.frame(size=as.integer(names(comps)), number=as.integer(comps))
+    # g$max.comp <- g$conn.comp[1L, 1L]
+    # g$num.tri <- sum(count_triangles(g)) / 3
+    # g$diameter <- diameter(g, weights=NA)
     g$transitivity <- transitivity(g)
     g$assort <- assortativity_degree(g)
 
     if (is_weighted(g)) {
       V(g)$strength <- strength(g)
       g$strength <- mean(V(g)$strength)
-      V(g)$knn.wt <- knn(g)$knn
-      V(g)$s.core <- s_core(g, A)
+      # V(g)$knn.wt <- knn(g)$knn
+      # V(g)$s.core <- s_core(g, A)
       g$rich.wt <- rich_club_all(g, weighted=TRUE, A=A)
       V(g)$transitivity.wt <- transitivity(g, type='weighted')
 
@@ -171,7 +197,7 @@ set_brainGraph_attr <- function(g, type=c('observed', 'random'),
         g$E.local.wt <- mean(V(g)$E.local.wt)
         V(g)$E.nodal.wt <- efficiency(g, 'nodal', D=D)
         g$E.global.wt <- mean(V(g)$E.nodal.wt)
-        g$diameter.wt <- diameter(g)
+        # g$diameter.wt <- diameter(g)
         V(g)$Lp.wt <- mean_distance_wt(g, 'vertex', D=D)
         g$Lp.wt <- mean_distance_wt(g, 'graph', D=D)
         if (clust.method == 'edge_betweenness') comm.wt <- cluster_edge_betweenness(g)
@@ -211,8 +237,8 @@ set_brainGraph_attr <- function(g, type=c('observed', 'random'),
       g$assort.lobe <- assortativity_nominal(g, as.integer(factor(V(g)$lobe)))
       g$assort.lobe.hemi <- assortativity_nominal(g, V(g)$lobe.hemi)
 
-      g$asymm <- edge_asymmetry(g, A=A)$asymm
-      V(g)$asymm <- edge_asymmetry(g, 'vertex', A=A)$asymm
+      # g$asymm <- edge_asymmetry(g, A=A)$asymm
+      # V(g)$asymm <- edge_asymmetry(g, 'vertex', A=A)$asymm
 
       E(g)$dist <- edge_spatial_dist(g)
       g$spatial.dist <- mean(E(g)$dist)
@@ -229,23 +255,23 @@ set_brainGraph_attr <- function(g, type=c('observed', 'random'),
     }
 
     D <- distances(g, weights=NA)
-    V(g)$knn <- knn(g, weights=NA)$knn
+    # V(g)$knn <- knn(g, weights=NA)$knn
     V(g)$Lp <- mean_distance_wt(g, 'vertex', weights=NA, D=D)
 
     E(g)$btwn <- edge.betweenness(g)
     V(g)$btwn.cent <- centr_betw(g)$res
     V(g)$hubs <- hubness(g, weights=NA)
     g$num.hubs <- sum(V(g)$hubs >= 2)
-    V(g)$ev.cent <- centr_eigen(g)$vector
-    V(g)$lev.cent <- centr_lev(g, A=A)
-    V(g)$k.core <- coreness(g)
+    # V(g)$ev.cent <- centr_eigen(g)$vector
+    # V(g)$lev.cent <- centr_lev(g, A=A)
+    # V(g)$k.core <- coreness(g)
     V(g)$transitivity <- transitivity(g, type='local', isolates='zero')
     V(g)$E.local <- efficiency(g, type='local', weights=NA, use.parallel=use.parallel, A=A)
     V(g)$E.nodal <- efficiency(g, type='nodal', weights=NA, D=D)
     g$E.local <- mean(V(g)$E.local)
     V(g)$vulnerability <- vulnerability(g, use.parallel=use.parallel)
     g$vulnerability <- max(V(g)$vulnerability)
-    V(g)$eccentricity <- eccentricity(g)
+    # V(g)$eccentricity <- eccentricity(g)
 
     # Community stuff
     x <- comm$membership
